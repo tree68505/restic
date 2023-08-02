@@ -617,7 +617,7 @@ repository in the bucket ``foo`` at the root path:
     enter password for new repository:
     enter password again:
 
-    created restic repository bde47d6254 at gs:foo/
+    created restic repository bde47d6254 at gs:foo:/
     [...]
 
 The number of concurrent connections to the GCS service can be set with the
@@ -626,6 +626,23 @@ established.
 
 The region, where a bucket should be created, can be specified with the ``-o gs.region=us`` switch. By default, the region is set to ``us``.
 
+User can define encryption keys to enable `customer-supplied encryption`_ for the repository.
+Keys must be a base64-encoded string of the AES-256 encryption key wanted.
+
+.. code-block:: console
+
+    $ export GOOGLE_ENCRYPTION_KEY=000000000...
+
+To enable key rotation, users can also define up to 100 decryption keys which will allow
+for access to the repo after a change of encryption key from first init.
+Decryption keys are formatting identically to encryption keys.
+
+.. code-block:: console
+
+    $ export GOOGLE_DECRYPTION_KEY1=001000000...
+    $ export GOOGLE_DECRYPTION_KEY100=1000000000...
+
+.. _customer-supplied encryption: https://cloud.google.com/storage/docs/encryption/customer-supplied-keys?hl=en
 .. _service account: https://cloud.google.com/iam/docs/service-account-overview
 .. _create a service account key: https://cloud.google.com/iam/docs/keys-create-delete
 .. _default authentication material: https://cloud.google.com/docs/authentication#service-accounts
