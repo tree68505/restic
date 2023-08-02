@@ -11,11 +11,6 @@ import (
 	"github.com/restic/restic/internal/restic"
 )
 
-type gsKeyTuple struct {
-	Key    []byte
-	KeySha string
-}
-
 // Config contains all configuration necessary to connect to a Google Cloud Storage
 // bucket. We use Google's default application credentials to acquire an access token, so
 // we don't require that calling code supply any authentication material here.
@@ -82,7 +77,9 @@ func (cfg *Config) ApplyEnvironment(prefix string) {
 	if cfg.DecryptionKeys == nil {
 		for i := 0; i < 100; i++ {
 			var gsDecryptKeyEnv string = os.Getenv("GOOGLE_DECRYPTION_KEY" + strconv.Itoa(i+1))
-			cfg.DecryptionKeys = append(cfg.DecryptionKeys, gsDecryptKeyEnv)
+			if gsDecryptKeyEnv != "" {
+				cfg.DecryptionKeys = append(cfg.DecryptionKeys, gsDecryptKeyEnv)
+			}
 		}
 	}
 }

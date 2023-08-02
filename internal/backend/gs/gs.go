@@ -113,17 +113,45 @@ func open(cfg Config, rt http.RoundTripper) (*Backend, error) {
 	}
 
 	//process keys
-	var encrypt_tuple gsKeyTuple
-	encrypt_tuple.Key, err = base64.StdEncoding.DecodeString(os.Getenv("GOOGLE_ENCRYPTION_KEY"))
-	if err != nil {
-		return nil, err
+	var encrypt_key gsKeyTuple
+	if cfg.EncryptionKey != "" {
+		encrypt_key.Key, err = base64.StdEncoding.DecodeString(cfg.EncryptionKey)
+		if err != nil {
+			err = errors.Errorf("Google Storage customer-supplied encryption key not Base64.")
+			return nil, err
+		}
+		if len(encrypt_key.Key) != 32 {
+			err = errors.Errorf("Google Storage customer-supplied encryption key not 256 bits long.")
+			return nil, err
+		}
+		sha := sha256.Sum256(encrypt_key.Key)
+		encrypt_key.KeySha = base64.StdEncoding.EncodeToString(sha[:])
 	}
-	if len(encrypt_tuple.Key) != 32 {
-		err = errors.Errorf("Google Storage customer-supplied encryption key not 256 bits long.")
-		return nil, err
+
+	var decrypt_keys = make(map[string][]byte, 100)
+	if cfg.DecryptionKeys != nil {
+		for _, key := range cfg.DecryptionKeys {
+			var gsDecryptKeyEnv string = key
+			if gsDecryptKeyEnv != "" {
+				var gsKeyByte []byte
+				var gsKeyShaString string
+				var err error
+
+				gsKeyByte, err = base64.StdEncoding.DecodeString(gsDecryptKeyEnv)
+				if err != nil {
+					err = errors.Errorf("Google Storage customer-supplied decryption key not Base64.")
+					return nil, err
+				}
+				if len(gsKeyByte) != 32 {
+					err = errors.Errorf("Google Storage customer-supplied decryption key not 256 bits long.")
+					return nil, err
+				}
+				sha := sha256.Sum256(gsKeyByte)
+				gsKeyShaString = base64.StdEncoding.EncodeToString(sha[:])
+				decrypt_keys[gsKeyShaString] = gsKeyByte
+			}
+		}
 	}
-	sha := sha256.Sum256(encrypt_tuple.Key)
-	encrypt_tuple.KeySha = base64.StdEncoding.EncodeToString(sha[:])
 
 	be := &Backend{
 		gcsClient:   gcsClient,
@@ -133,8 +161,8 @@ func open(cfg Config, rt http.RoundTripper) (*Backend, error) {
 		region:      cfg.Region,
 		bucket:      gcsClient.Bucket(cfg.Bucket),
 		prefix:      cfg.Prefix,
-		encryptKey:  encrypt_tuple,
-		decryptKeys: cfg.DecryptionKeys,
+		encryptKey:  encrypt_key,
+		decryptKeys: decrypt_keys,
 		Layout: &layout.DefaultLayout{
 			Path: cfg.Prefix,
 			Join: path.Join,
