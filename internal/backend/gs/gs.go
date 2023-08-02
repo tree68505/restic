@@ -4,6 +4,8 @@ package gs
 import (
 	"context"
 	"crypto/md5"
+	"crypto/sha256"
+	"encoding/base64"
 	"hash"
 	"io"
 	"net/http"
@@ -45,6 +47,11 @@ type Backend struct {
 	layout.Layout
 	encryptKey  gsKeyTuple
 	decryptKeys map[string][]byte
+}
+
+type gsKeyTuple struct {
+	Key    []byte
+	KeySha string
 }
 
 // Ensure that *Backend implements restic.Backend.
@@ -105,6 +112,19 @@ func open(cfg Config, rt http.RoundTripper) (*Backend, error) {
 		return nil, errors.Wrap(err, "getStorageClient")
 	}
 
+	//process keys
+	var encrypt_tuple gsKeyTuple
+	encrypt_tuple.Key, err = base64.StdEncoding.DecodeString(os.Getenv("GOOGLE_ENCRYPTION_KEY"))
+	if err != nil {
+		return nil, err
+	}
+	if len(encrypt_tuple.Key) != 32 {
+		err = errors.Errorf("Google Storage customer-supplied encryption key not 256 bits long.")
+		return nil, err
+	}
+	sha := sha256.Sum256(encrypt_tuple.Key)
+	encrypt_tuple.KeySha = base64.StdEncoding.EncodeToString(sha[:])
+
 	be := &Backend{
 		gcsClient:   gcsClient,
 		projectID:   cfg.ProjectID,
@@ -113,7 +133,7 @@ func open(cfg Config, rt http.RoundTripper) (*Backend, error) {
 		region:      cfg.Region,
 		bucket:      gcsClient.Bucket(cfg.Bucket),
 		prefix:      cfg.Prefix,
-		encryptKey:  cfg.EncryptionKey,
+		encryptKey:  encrypt_tuple,
 		decryptKeys: cfg.DecryptionKeys,
 		Layout: &layout.DefaultLayout{
 			Path: cfg.Prefix,

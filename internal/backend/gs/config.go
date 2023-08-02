@@ -3,6 +3,7 @@ package gs
 import (
 	"os"
 	"path"
+	"strconv"
 	"strings"
 
 	"github.com/restic/restic/internal/errors"
@@ -27,8 +28,8 @@ type Config struct {
 	Region      string `option:"region" help:"region to create the bucket in (default: us)"`
 
 	//https://cloud.google.com/storage/docs/encryption/customer-supplied-keys#gsutil
-	EncryptionKey  gsKeyTuple        `option:"encryption_key" help:"Use custom-supplied encryption key."`
-	DecryptionKeys map[string][]byte `option:"decryption_keys" help:"Use custom-supplied decryption keys."`
+	EncryptionKey  string   `option:"encryption_key" help:"Use custom-supplied encryption key."`
+	DecryptionKeys []string `option:"decryption_keys" help:"Use custom-supplied decryption keys."`
 }
 
 // NewConfig returns a new Config with the default values filled in.
@@ -74,5 +75,14 @@ var _ restic.ApplyEnvironmenter = &Config{}
 func (cfg *Config) ApplyEnvironment(prefix string) {
 	if cfg.ProjectID == "" {
 		cfg.ProjectID = os.Getenv(prefix + "GOOGLE_PROJECT_ID")
+	}
+	if cfg.EncryptionKey == "" {
+		cfg.EncryptionKey = os.Getenv("GOOGLE_ENCRYPTION_KEY")
+	}
+	if cfg.DecryptionKeys == nil {
+		for i := 0; i < 100; i++ {
+			var gsDecryptKeyEnv string = os.Getenv("GOOGLE_DECRYPTION_KEY" + strconv.Itoa(i+1))
+			cfg.DecryptionKeys = append(cfg.DecryptionKeys, gsDecryptKeyEnv)
+		}
 	}
 }
